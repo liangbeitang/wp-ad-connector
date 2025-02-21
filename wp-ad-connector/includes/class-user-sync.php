@@ -92,25 +92,6 @@ class WPAD_User_Sync {
         return ($user !== false);
     }
 
-    /**
-     * 在 WordPress 中创建新用户
-     *
-     * @param array $ad_data 从 AD 中获取的用户数据
-     */
-    private function create_wp_user($ad_data) {
-        $user_id = wp_insert_user([
-            'user_login' => $ad_data['employeeId'],
-            'user_pass'  => wp_generate_password(),
-            'user_email' => $ad_data['mail'],
-            'role'       => $this->map_ad_group($ad_data['memberOf'])
-        ]);
-
-        if (!is_wp_error($user_id)) {
-            // 更新用户元数据，存储 AD 的 GUID
-            update_user_meta($user_id, 'ad_guid', $ad_data['objectGUID']);
-            do_action('wpad_user_created', $user_id);
-        }
-    }
 
     /**
      * 更新 WordPress 用户的元数据
@@ -177,4 +158,26 @@ class WPAD_User_Sync {
         // 这里可以实现清理非活动用户的逻辑
         // 例如，根据 AD 中的用户状态，删除 WordPress 中对应的非活动用户
     }
+    //如果用户不存在，需要创建新用户。
+private function create_wp_user($ad_data) {
+    $user_id = wp_insert_user([
+        'user_login' => $ad_data['employeeId'],
+        'user_pass'  => $ad_data['password'], // 假设AD数据中有password字段
+        'user_email' => $ad_data['mail'],
+        'nickname'   => $ad_data['cn'],
+        'display_name' => $ad_data['cn'],
+        'role'       => 'contributor'
+    ]);
+
+    if (!is_wp_error($user_id)) {
+        // 更新用户元数据，存储 AD 的 GUID
+        update_user_meta($user_id, 'ad_guid', $ad_data['objectGUID']);
+        do_action('wpad_user_created', $user_id);
+    }
+}
+
+
+    
+    
+    
 }

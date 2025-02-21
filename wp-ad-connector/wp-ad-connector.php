@@ -51,12 +51,13 @@ add_action('plugins_loaded', function() {
         $ad_ip_address = sanitize_text_field($_POST['ad_ip_address']);
         $ad_admin_username = sanitize_text_field($_POST['ad_admin_username']);
         $ad_admin_password = sanitize_text_field($_POST['ad_admin_password']);
+        $ad_admin_domain = sanitize_text_field($_POST['ad_admin_domain']); // 添加获取域名的代码
 
         // 实例化 AD 操作类
         $ad_operator = new WPAD_AD_Operator();
 
         // 调用验证方法
-        $result = $ad_operator->verify_admin_login($ad_ip_address, $ad_admin_username, $ad_admin_password);
+        $result = $ad_operator->verify_admin_login($ad_ip_address, $ad_admin_username, $ad_admin_password, $ad_admin_domain);
 
         if ($result) {
             wp_send_json_success('AD 配置验证成功');
