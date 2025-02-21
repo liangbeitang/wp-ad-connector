@@ -2,6 +2,9 @@
 /**
  * 该类负责处理与 Active Directory 的连接和基本操作
  */
+ 
+ require_once dirname(__FILE__) . '/ajax-handlers.php';
+ 
 class WPAD_AD_Operator {
     private $ldap_connection;
     private $ldap_host;
@@ -9,6 +12,7 @@ class WPAD_AD_Operator {
     private $ldap_dn;
     private $ldap_password;
     private $use_ldaps;
+    private $base_dn; // 新增属性，用于存储基础 DN
 
     /**
      * 构造函数，初始化 AD 连接所需的参数
@@ -24,6 +28,8 @@ class WPAD_AD_Operator {
         $this->ldap_password = get_option('wpad_service_account_password');
         // 从 WordPress 选项中获取是否使用 LDAPS 协议，默认为 false
         $this->use_ldaps = get_option('wpad_use_ldaps', false);
+        // 从 WordPress 选项中获取基础 DN
+        $this->base_dn = get_option('wpad_ad_search_org_dn'); // 新增代码，获取基础 DN
     }
 
     /**
@@ -119,6 +125,70 @@ class WPAD_AD_Operator {
             error_log("修改 AD 用户密码失败: " . ldap_error($this->ldap_connection));
             return false;
         }
+    }
+
+    /**
+     * 验证 AD 配置
+     *
+     * @param string $ad_admin_domain AD 管理员域名
+     * @param string $ad_admin_password AD 管理员密码
+     * @param string $ad_search_org_dn AD 搜索组织 DN
+     * @return bool 如果验证成功，返回 true；否则返回 false
+     */
+    public function verify_ad_config($ad_admin_domain, $ad_admin_password, $ad_search_org_dn) {
+        if (!$this->ldap_connection) {
+            if (!$this->connect()) {
+                // 记录连接失败的错误信息
+                error_log("LDAP 连接失败: " . ldap_error($this->ldap_connection));
+                return false;
+            }
+        }
+
+        // 这里可以根据实际情况调整验证逻辑，例如使用 ldap_bind 进行验证
+        $bind_result = ldap_bind($this->ldap_connection, $ad_admin_domain, $ad_admin_password);
+
+        if ($bind_result) {
+            // 验证成功，可以进行进一步的操作，例如搜索用户
+            $search_result = ldap_search($this->ldap_connection, $ad_search_org_dn, '(objectClass=*)');
+            if ($search_result) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 验证 AD employeeID 和密码
+     *
+     * @param string $employee_id AD employeeID
+     * @param string $password 密码
+     * @return bool 如果验证成功，返回 true；否则返回 false
+     */
+    public function verify_ad_employee_id_and_password($employee_id, $password) {
+        if (!$this->ldap_connection) {
+            if (!$this->connect()) {
+                return false;
+            }
+        }
+
+        // 根据 employeeID 查找用户 DN
+        $filter = "(employeeID=$employee_id)";
+        $search_result = ldap_search($this->ldap_connection, $this->base_dn, $filter);
+        if ($search_result) {
+            $entries = ldap_get_entries($this->ldap_connection, $search_result);
+            if ($entries['count'] > 0) {
+                $user_dn = $entries[0]['dn'];
+
+                // 验证密码
+                $bind_result = ldap_bind($this->ldap_connection, $user_dn, $password);
+                if ($bind_result) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
