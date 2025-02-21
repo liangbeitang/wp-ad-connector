@@ -48,9 +48,15 @@ add_action('wp_ajax_ad_verify_config', function() {
         if ($result) {
             wp_send_json_success();
         } else {
-            $error = ldap_error($ad_operator->ldap_connection);
-            error_log("AD 验证失败: {$error}");
-            wp_send_json_error(['message' => "AD 验证失败: {$error}"]);
+            $ldap_connection = $ad_operator->getLdapConnection(); // 修改这里
+            if ($ldap_connection) {
+                $error = ldap_error($ldap_connection);
+                error_log("AD 验证失败: {$error}");
+                wp_send_json_error(['message' => "AD 验证失败: {$error}"]);
+            } else {
+                error_log("AD 验证失败: 未建立 LDAP 连接");
+                wp_send_json_error(['message' => "AD 验证失败: 未建立 LDAP 连接"]);
+            }
         }
     } catch (Exception $e) {
         // 捕获可能的异常

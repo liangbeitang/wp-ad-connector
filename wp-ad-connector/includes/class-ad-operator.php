@@ -24,6 +24,12 @@ class WPAD_AD_Operator {
         $this->ldap_password = get_option('wpad_service_account_password', '');
         $this->use_ldaps = (get_option('wpad_use_ldaps', '0') === '1');
         $this->base_dn = get_option('wpad_ad_search_org_dn', '');
+
+        // 可以添加日志输出，检查获取的配置信息
+        error_log("LDAP Host: " . $this->ldap_host);
+        error_log("LDAP Port: " . $this->ldap_port);
+        error_log("LDAP DN: " . $this->ldap_dn);
+        error_log("LDAP Password: " . $this->ldap_password);
     }
 
     /**
@@ -46,6 +52,8 @@ class WPAD_AD_Operator {
         $bind = ldap_bind($this->ldap_connection, $this->ldap_dn, $this->ldap_password);
         if (!$bind) {
             error_log("LDAP绑定失败: " . ldap_error($this->ldap_connection));
+            error_log("使用的 DN: " . $this->ldap_dn);
+            error_log("使用的密码: " . $this->ldap_password);
             return false;
         }
 
@@ -262,4 +270,8 @@ class WPAD_AD_Operator {
             ldap_close($this->ldap_connection);
         }
     }
+    
+    public function getLdapConnection() {
+    return $this->ldap_connection;
+}
 }

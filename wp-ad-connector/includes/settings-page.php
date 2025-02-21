@@ -52,7 +52,9 @@ class WPAD_Settings_Page {
             update_option('wpad_admin_domain', sanitize_text_field($_POST['ad_admin_domain']));
         }
         if (isset($_POST['ad_admin_username'])) {
-            update_option('wpad_admin_username', sanitize_text_field($_POST['ad_admin_username']));
+            // 对包含反斜杠的用户名进行处理，防止转义问题
+            $admin_username = stripslashes($_POST['ad_admin_username']); 
+            update_option('wpad_admin_username', $admin_username);
         }
 
         // 解析IP和端口
@@ -61,13 +63,12 @@ class WPAD_Settings_Page {
         $ip_address = $parts[0];
         $port = isset($parts[1]) ? $parts[1] : 389;
 
-        $admin_username = sanitize_text_field($_POST['ad_admin_username']);
         $admin_domain = sanitize_text_field($_POST['ad_admin_domain']);
         $admin_password = sanitize_text_field($_POST['ad_admin_password']);
         $search_org_dn = sanitize_text_field($_POST['ad_search_org_dn']);
 
         // 组合服务账户DN为"域\用户名"格式
-        $service_account_dn = "{$admin_domain}\\{$admin_username}";
+        $service_account_dn = $admin_domain . '\\' . $admin_username;
 
         // 保存到正确的选项名称
         update_option('wpad_ldap_host', $ip_address);
@@ -89,20 +90,12 @@ class WPAD_Settings_Page {
         $config_saved = isset($_GET['config_saved']) && $_GET['config_saved'] == 1;
 
         $ip_address = get_option('wpad_ldap_host', ''); // 修改为新的选项名
-        $admin_username = ''; // 这里不再直接从选项获取，因为格式变了
-        $admin_domain = '';   // 同上
+        $admin_username = get_option('wpad_admin_username', ''); // 直接获取保存的用户名
+        $admin_domain = get_option('wpad_admin_domain', ''); // 直接获取保存的域名
         $admin_password = get_option('wpad_service_account_password', ''); // 修改为新的选项名
         $search_org_dn = get_option('wpad_ad_search_org_dn', '');
 
-        // 尝试从 service_account_dn 解析出用户名和域名
-        $service_account_dn = get_option('wpad_service_account_dn', '');
-        if ($service_account_dn) {
-            $parts = explode('\\', $service_account_dn);
-            if (count($parts) == 2) {
-                $admin_domain = $parts[0];
-                $admin_username = $parts[1];
-            }
-        }
+        // 不再尝试从 service_account_dn 解析出用户名和域名
 
         ?>
         <div class="wrap">
