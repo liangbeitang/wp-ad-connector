@@ -45,23 +45,32 @@ class WPAD_Settings_Page {
      * 处理保存 AD 服务器配置信息的请求
      */
     public function handle_save_ad_config() {
-    check_admin_referer('wpad_save_ad_config_nonce');
+        check_admin_referer('wpad_save_ad_config_nonce');
 
-    $ip_address = sanitize_text_field($_POST['ad_ip_address']);
-    $admin_username = stripslashes(sanitize_text_field($_POST['ad_admin_username'])); // 修改这一行
-    $admin_domain = sanitize_text_field($_POST['ad_admin_domain']);
-    $admin_password = sanitize_text_field($_POST['ad_admin_password']);
-    $search_org_dn = sanitize_text_field($_POST['ad_search_org_dn']);
+        // 解析IP和端口
+        $ad_server = sanitize_text_field($_POST['ad_ip_address']);
+        $parts = explode(':', $ad_server);
+        $ip_address = $parts[0];
+        $port = isset($parts[1]) ? $parts[1] : 389;
 
-    update_option('wpad_ad_ip_address', $ip_address);
-    update_option('wpad_ad_admin_username', $admin_username);
-    update_option('wpad_ad_admin_domain', $admin_domain);
-    update_option('wpad_ad_admin_password', $admin_password);
-    update_option('wpad_ad_search_org_dn', $search_org_dn);
+        $admin_username = sanitize_text_field($_POST['ad_admin_username']);
+        $admin_domain = sanitize_text_field($_POST['ad_admin_domain']);
+        $admin_password = sanitize_text_field($_POST['ad_admin_password']);
+        $search_org_dn = sanitize_text_field($_POST['ad_search_org_dn']);
 
-    wp_redirect(admin_url('admin.php?page=wp-ad-connector-admin&config_saved=1'));
-    exit;
-}
+        // 组合服务账户DN为"域\用户名"格式
+        $service_account_dn = "{$admin_domain}\\{$admin_username}";
+
+        // 保存到正确的选项名称
+        update_option('wpad_ldap_host', $ip_address);
+        update_option('wpad_ldap_port', $port);
+        update_option('wpad_service_account_dn', $service_account_dn);
+        update_option('wpad_service_account_password', $admin_password);
+        update_option('wpad_ad_search_org_dn', $search_org_dn);
+
+        wp_redirect(admin_url('admin.php?page=wp-ad-connector-admin&config_saved=1'));
+        exit;
+    }
 
     /**
      * 渲染管理页面 HTML
@@ -70,11 +79,21 @@ class WPAD_Settings_Page {
         $sync_success = isset($_GET['sync_success']) && $_GET['sync_success'] == 1;
         $config_saved = isset($_GET['config_saved']) && $_GET['config_saved'] == 1;
 
-        $ip_address = get_option('wpad_ad_ip_address', '');
-        $admin_username = get_option('wpad_ad_admin_username', '');
-        $admin_domain = get_option('wpad_ad_admin_domain', '');
-        $admin_password = get_option('wpad_ad_admin_password', '');
+        $ip_address = get_option('wpad_ldap_host', ''); // 修改为新的选项名
+        $admin_username = ''; // 这里不再直接从选项获取，因为格式变了
+        $admin_domain = '';   // 同上
+        $admin_password = get_option('wpad_service_account_password', ''); // 修改为新的选项名
         $search_org_dn = get_option('wpad_ad_search_org_dn', '');
+
+        // 尝试从 service_account_dn 解析出用户名和域名
+        $service_account_dn = get_option('wpad_service_account_dn', '');
+        if ($service_account_dn) {
+            $parts = explode('\\', $service_account_dn);
+            if (count($parts) == 2) {
+                $admin_domain = $parts[0];
+                $admin_username = $parts[1];
+            }
+        }
 
         ?>
         <div class="wrap">
@@ -143,14 +162,20 @@ class WPAD_Settings_Page {
                 <script type="text/javascript">
                     jQuery(document).ready(function($) {
                         $("#ad-config-verify").click(function() {
+                            // 获取所有需要的字段
+                            var ad_ip_address = $("#ad_ip_address").val();
+                            var ad_admin_username = $("#ad_admin_username").val();
                             var ad_admin_domain = $("#ad_admin_domain").val();
                             var ad_admin_password = $("#ad_admin_password").val();
                             var ad_search_org_dn = $("#ad_search_org_dn").val();
+
                             $.ajax({
                                 url: ajaxurl,
                                 type: "POST",
                                 data: {
                                     action: "ad_verify_config",
+                                    ad_ip_address: ad_ip_address,
+                                    ad_admin_username: ad_admin_username,
                                     ad_admin_domain: ad_admin_domain,
                                     ad_admin_password: ad_admin_password,
                                     ad_search_org_dn: ad_search_org_dn

@@ -18,18 +18,12 @@ class WPAD_AD_Operator {
      * 构造函数，初始化 AD 连接所需的参数
      */
     public function __construct() {
-        // 从 WordPress 选项中获取 AD 服务器的主机名，默认为 'dc.example.com'
-        $this->ldap_host = get_option('wpad_ldap_host', 'dc.example.com');
-        // 从 WordPress 选项中获取 AD 服务器的端口号，默认为 389（LDAP）
+        $this->ldap_host = get_option('wpad_ldap_host', '');
         $this->ldap_port = get_option('wpad_ldap_port', 389);
-        // 从 WordPress 选项中获取服务账户的 DN
-        $this->ldap_dn = get_option('wpad_service_account_dn');
-        // 从 WordPress 选项中获取服务账户的密码
-        $this->ldap_password = get_option('wpad_service_account_password');
-        // 从 WordPress 选项中获取是否使用 LDAPS 协议，默认为 false
-        $this->use_ldaps = get_option('wpad_use_ldaps', false);
-        // 从 WordPress 选项中获取基础 DN
-        $this->base_dn = get_option('wpad_ad_search_org_dn'); // 新增代码，获取基础 DN
+        $this->ldap_dn = get_option('wpad_service_account_dn', '');
+        $this->ldap_password = get_option('wpad_service_account_password', '');
+        $this->use_ldaps = (get_option('wpad_use_ldaps', '0') === '1');
+        $this->base_dn = get_option('wpad_ad_search_org_dn', '');
     }
 
     /**
@@ -38,28 +32,24 @@ class WPAD_AD_Operator {
      * @return bool|resource 如果连接成功，返回 LDAP 连接资源；否则返回 false
      */
     public function connect() {
-        if ($this->use_ldaps) {
-            $this->ldap_connection = ldap_connect("ldaps://{$this->ldap_host}:{$this->ldap_port}");
-        } else {
-            $this->ldap_connection = ldap_connect($this->ldap_host, $this->ldap_port);
-        }
+        $protocol = $this->use_ldaps ? 'ldaps://' : 'ldap://';
+        $this->ldap_connection = ldap_connect($protocol . $this->ldap_host, $this->ldap_port);
 
-        if ($this->ldap_connection) {
-            ldap_set_option($this->ldap_connection, LDAP_OPT_PROTOCOL_VERSION, 3);
-            ldap_set_option($this->ldap_connection, LDAP_OPT_REFERRALS, 0);
-
-            // 绑定服务账户
-            $bind = ldap_bind($this->ldap_connection, $this->ldap_dn, $this->ldap_password);
-            if ($bind) {
-                return $this->ldap_connection;
-            } else {
-                error_log("LDAP 绑定失败: " . ldap_error($this->ldap_connection));
-                return false;
-            }
-        } else {
-            error_log("无法连接到 LDAP 服务器: {$this->ldap_host}:{$this->ldap_port}");
+        if (!$this->ldap_connection) {
+            error_log("无法连接LDAP服务器: {$protocol}{$this->ldap_host}:{$this->ldap_port}");
             return false;
         }
+
+        ldap_set_option($this->ldap_connection, LDAP_OPT_PROTOCOL_VERSION, 3);
+        ldap_set_option($this->ldap_connection, LDAP_OPT_REFERRALS, 0);
+
+        $bind = ldap_bind($this->ldap_connection, $this->ldap_dn, $this->ldap_password);
+        if (!$bind) {
+            error_log("LDAP绑定失败: " . ldap_error($this->ldap_connection));
+            return false;
+        }
+
+        return $this->ldap_connection;
     }
 
     /**
@@ -130,32 +120,70 @@ class WPAD_AD_Operator {
     /**
      * 验证 AD 配置
      *
-     * @param string $ad_admin_domain AD 管理员域名
-     * @param string $ad_admin_password AD 管理员密码
-     * @param string $ad_search_org_dn AD 搜索组织 DN
+     * @param string $host AD 服务器主机名
+     * @param int $port AD 服务器端口号
+     * @param string $dn 服务账户的 DN
+     * @param string $password 服务账户的密码
+     * @param string $base_dn 基础 DN
      * @return bool 如果验证成功，返回 true；否则返回 false
      */
-    public function verify_ad_config($ad_admin_domain, $ad_admin_password, $ad_search_org_dn) {
-        if (!$this->ldap_connection) {
-            if (!$this->connect()) {
-                // 记录连接失败的错误信息
-                error_log("LDAP 连接失败: " . ldap_error($this->ldap_connection));
-                return false;
-            }
+    public function verify_ad_config($host, $port, $dn, $password, $base_dn) {
+        // 保存原始属性值
+        $original_host = $this->ldap_host;
+        $original_port = $this->ldap_port;
+        $original_dn = $this->ldap_dn;
+        $original_password = $this->ldap_password;
+        $original_base_dn = $this->base_dn;
+
+        // 临时覆盖类属性
+        $this->ldap_host = $host;
+        $this->ldap_port = $port;
+        $this->ldap_dn = $dn;
+        $this->ldap_password = $password;
+        $this->base_dn = $base_dn;
+
+        // 强制不使用LDAPS
+        $this->use_ldaps = false;
+
+        // 建立连接
+        if (!$this->connect()) {
+            error_log("连接失败: ".ldap_error($this->ldap_connection));
+            // 恢复原始属性值
+            $this->ldap_host = $original_host;
+            $this->ldap_port = $original_port;
+            $this->ldap_dn = $original_dn;
+            $this->ldap_password = $original_password;
+            $this->base_dn = $original_base_dn;
+            return false;
         }
 
-        // 这里可以根据实际情况调整验证逻辑，例如使用 ldap_bind 进行验证
-        $bind_result = ldap_bind($this->ldap_connection, $ad_admin_domain, $ad_admin_password);
-
-        if ($bind_result) {
-            // 验证成功，可以进行进一步的操作，例如搜索用户
-            $search_result = ldap_search($this->ldap_connection, $ad_search_org_dn, '(objectClass=*)');
-            if ($search_result) {
-                return true;
-            }
+        // 执行基础DN搜索验证
+        try {
+            $search = @ldap_search(
+                $this->ldap_connection,
+                $base_dn,
+                '(objectClass=*)',
+                [],
+                0,
+                1
+            );
+            // 恢复原始属性值
+            $this->ldap_host = $original_host;
+            $this->ldap_port = $original_port;
+            $this->ldap_dn = $original_dn;
+            $this->ldap_password = $original_password;
+            $this->base_dn = $original_base_dn;
+            return $search !== false;
+        } catch (Exception $e) {
+            error_log("DN搜索失败: ".$e->getMessage());
+            // 恢复原始属性值
+            $this->ldap_host = $original_host;
+            $this->ldap_port = $original_port;
+            $this->ldap_dn = $original_dn;
+            $this->ldap_password = $original_password;
+            $this->base_dn = $original_base_dn;
+            return false;
         }
-
-        return false;
     }
 
     /**
