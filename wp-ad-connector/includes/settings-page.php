@@ -47,6 +47,14 @@ class WPAD_Settings_Page {
     public function handle_save_ad_config() {
         check_admin_referer('wpad_save_ad_config_nonce');
 
+        // 保存配置逻辑
+        if (isset($_POST['ad_admin_domain'])) {
+            update_option('wpad_admin_domain', sanitize_text_field($_POST['ad_admin_domain']));
+        }
+        if (isset($_POST['ad_admin_username'])) {
+            update_option('wpad_admin_username', sanitize_text_field($_POST['ad_admin_username']));
+        }
+
         // 解析IP和端口
         $ad_server = sanitize_text_field($_POST['ad_ip_address']);
         $parts = explode(':', $ad_server);
@@ -68,7 +76,8 @@ class WPAD_Settings_Page {
         update_option('wpad_service_account_password', $admin_password);
         update_option('wpad_ad_search_org_dn', $search_org_dn);
 
-        wp_redirect(admin_url('admin.php?page=wp-ad-connector-admin&config_saved=1'));
+        // 保存成功后重定向并添加配置保存成功的标志
+        wp_redirect(add_query_arg('config_saved', 1, admin_url('admin.php?page=wp-ad-connector-admin')));
         exit;
     }
 
@@ -158,65 +167,62 @@ class WPAD_Settings_Page {
                     <input type="button" class="button" id="ad-config-verify" value="验证 AD 配置">
                 </p>
 
-                <!-- 添加 JavaScript 代码来处理验证按钮的点击事件 -->
-                <script type="text/javascript">
-                    jQuery(document).ready(function($) {
-                        $("#ad-config-verify").click(function() {
-                            // 获取所有需要的字段
-                            var ad_ip_address = $("#ad_ip_address").val();
-                            var ad_admin_username = $("#ad_admin_username").val();
-                            var ad_admin_domain = $("#ad_admin_domain").val();
-                            var ad_admin_password = $("#ad_admin_password").val();
-                            var ad_search_org_dn = $("#ad_search_org_dn").val();
+<!-- 添加 JavaScript 代码来处理验证按钮的点击事件 -->
+<script type="text/javascript">
+    jQuery(document).ready(function($) {
+        $("#ad-config-verify").click(function() {
+            // 获取需要的字段
+            var ad_ip_address = $("#ad_ip_address").val();
+            var ad_admin_username = $("#ad_admin_username").val();
+            var ad_admin_password = $("#ad_admin_password").val();
+            var ad_admin_domain = $("#ad_admin_domain").val();
+            var ad_search_org_dn = $("#ad_search_org_dn").val(); // 确保获取 ad_search_org_dn 的值
 
-                            $.ajax({
-                                url: ajaxurl,
-                                type: "POST",
-                                data: {
-                                    action: "ad_verify_config",
-                                    ad_ip_address: ad_ip_address,
-                                    ad_admin_username: ad_admin_username,
-                                    ad_admin_domain: ad_admin_domain,
-                                    ad_admin_password: ad_admin_password,
-                                    ad_search_org_dn: ad_search_org_dn
-                                },
-                                success: function(response) {
-                                    if (response.success) {
-                                        // 验证成功，显示绿色提示
-                                        var successMessage = "验证成功<br>验证域名: " + ad_admin_domain + "<br>DN: " + ad_search_org_dn;
-                                        showMessage(successMessage, 'green');
-                                    } else {
-                                        // 验证失败，显示红色提示
-                                        var errorMessage = "验证失败: " + response.data.message;
-                                        showMessage(errorMessage, 'red');
-                                    }
-                                },
-                                error: function() {
-                                    // 验证请求失败，显示红色提示
-                                    showMessage("验证请求失败，请稍后重试。", 'red');
-                                }
-                            });
-                        });
+            $.ajax({
+                url: ajaxurl,
+                type: "POST",
+                data: {
+                    action: "ad_verify_config",
+                    ad_ip_address: ad_ip_address,
+                    ad_admin_username: ad_admin_username,
+                    ad_admin_password: ad_admin_password,
+                    ad_admin_domain: ad_admin_domain,
+                    ad_search_org_dn: ad_search_org_dn // 添加 ad_search_org_dn 参数
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // 验证成功，显示绿色提示
+                        var successMessage = "验证成功<br>服务器地址: " + ad_ip_address + "<br>用户名: " + ad_admin_username;
+                        showMessage(successMessage, 'green');
+                    } else {
+                        // 验证失败，显示红色提示
+                        var errorMessage = "验证失败: " + response.data.message;
+                        showMessage(errorMessage, 'red');
+                    }
+                },
+                error: function() {
+                    // 验证请求失败，显示红色提示
+                    showMessage("验证请求失败，请稍后重试。", 'red');
+                }
+            });
+        });
 
-                        // 显示提示信息的函数
-                        function showMessage(message, color) {
-                            var messageDiv = $('<div></div>')
-                               .html(message)
-                               .css({
-                                    'color': color,
-                                    'padding': '10px',
-                                    'margin': '10px 0',
-                                    'border': '1px solid ' + color
-                                });
-                            $('#ad-config-verify').after(messageDiv);
-                        }
-                    });
-                </script>
+        // 显示提示信息的函数
+        function showMessage(message, color) {
+            var messageDiv = $('<div></div>')
+               .html(message)
+               .css({
+                    'color': color,
+                    'padding': '10px',
+                    'margin': '10px 0',
+                    'border': '1px solid ' + color
+                });
+            $('#ad-config-verify').after(messageDiv);
+        }
+    });
+</script>
             </form>
         </div>
         <?php
     }
 }
-
-// 实例化设置页面类
-//new WPAD_Settings_Page();

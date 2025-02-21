@@ -3,7 +3,7 @@
  * 该类负责处理与 Active Directory 的连接和基本操作
  */
  
- require_once dirname(__FILE__) . '/ajax-handlers.php';
+require_once dirname(__FILE__) . '/ajax-handlers.php';
  
 class WPAD_AD_Operator {
     private $ldap_connection;
@@ -217,6 +217,41 @@ class WPAD_AD_Operator {
         }
 
         return false;
+    }
+
+    /**
+     * 验证 AD 管理员登录
+     *
+     * @param string $ad_ip_address AD 服务器 IP 地址
+     * @param string $ad_admin_username AD 管理员用户名
+     * @param string $ad_admin_password AD 管理员密码
+     * @param string $ad_admin_domain AD 管理员域名
+     * @return bool 如果验证成功，返回 true；否则返回 false
+     */
+    public function verify_admin_login($ad_ip_address, $ad_admin_username, $ad_admin_password, $ad_admin_domain) {
+        // 连接到 AD 服务器
+        $ldap_connection = ldap_connect($ad_ip_address);
+        if (!$ldap_connection) {
+            error_log("无法连接到 AD 服务器: $ad_ip_address");
+            return false;
+        }
+
+        // 设置 LDAP 协议版本
+        ldap_set_option($ldap_connection, LDAP_OPT_PROTOCOL_VERSION, 3);
+
+        // 尝试绑定，这里可能需要使用 ad_admin_domain 构建完整的用户名
+        $full_username = $ad_admin_domain . '\\' . $ad_admin_username;
+        $bind_result = ldap_bind($ldap_connection, $full_username, $ad_admin_password);
+        if (!$bind_result) {
+            error_log("AD 管理员用户登录失败: " . ldap_error($ldap_connection));
+            ldap_close($ldap_connection);
+            return false;
+        }
+
+        // 关闭连接
+        ldap_close($ldap_connection);
+
+        return true;
     }
 
     /**

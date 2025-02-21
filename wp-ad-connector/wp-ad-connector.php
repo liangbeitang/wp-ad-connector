@@ -48,15 +48,15 @@ add_action('plugins_loaded', function() {
 
     // 处理验证 AD 配置的 AJAX 请求
     add_action('wp_ajax_ad_verify_config', function() {
-        $ad_admin_domain = sanitize_text_field($_POST['ad_admin_domain']);
+        $ad_ip_address = sanitize_text_field($_POST['ad_ip_address']);
+        $ad_admin_username = sanitize_text_field($_POST['ad_admin_username']);
         $ad_admin_password = sanitize_text_field($_POST['ad_admin_password']);
-        $ad_search_org_dn = sanitize_text_field($_POST['ad_search_org_dn']);
 
         // 实例化 AD 操作类
         $ad_operator = new WPAD_AD_Operator();
 
         // 调用验证方法
-        $result = $ad_operator->verify_ad_config($ad_admin_domain, $ad_admin_password, $ad_search_org_dn);
+        $result = $ad_operator->verify_admin_login($ad_ip_address, $ad_admin_username, $ad_admin_password);
 
         if ($result) {
             wp_send_json_success('AD 配置验证成功');
@@ -68,36 +68,36 @@ add_action('plugins_loaded', function() {
     add_action('wp_ajax_nopriv_ad_verify_config', function() {
         wp_send_json_error('你没有权限进行此操作。');
     });
-});
 
-// 添加 WP-CLI 命令，方便通过命令行进行用户同步操作
-if (defined('WP_CLI') && WP_CLI) {
-    class WPAD_Connector_CLI_Command extends WP_CLI_Command {
-        /**
-         * 执行用户同步操作。
-         *
-         * ## OPTIONS
-         *
-         * [--full]
-         * : 执行全量同步。
-         *
-         * ## EXAMPLES
-         *
-         *     wp ad-connector sync-users
-         *     wp ad-connector sync-users --full
-         */
-        public function sync_users($args, $assoc_args) {
-            require_once dirname(__FILE__) . '/includes/class-user-sync.php';
-            $user_sync = new WPAD_User_Sync();
-            if (isset($assoc_args['full'])) {
-                // 这里可以实现全量同步的逻辑
-                WP_CLI::log('执行全量用户同步...');
-            } else {
-                // 执行增量同步
-                $user_sync->sync_users();
-                WP_CLI::log('执行增量用户同步...');
+    // 添加 WP-CLI 命令，方便通过命令行进行用户同步操作
+    if (defined('WP_CLI') && WP_CLI) {
+        class WPAD_Connector_CLI_Command extends WP_CLI_Command {
+            /**
+             * 执行用户同步操作。
+             *
+             * ## OPTIONS
+             *
+             * [--full]
+             * : 执行全量同步。
+             *
+             * ## EXAMPLES
+             *
+             *     wp ad-connector sync-users
+             *     wp ad-connector sync-users --full
+             */
+            public function sync_users($args, $assoc_args) {
+                require_once dirname(__FILE__) . '/includes/class-user-sync.php';
+                $user_sync = new WPAD_User_Sync();
+                if (isset($assoc_args['full'])) {
+                    // 这里可以实现全量同步的逻辑
+                    WP_CLI::log('执行全量用户同步...');
+                } else {
+                    // 执行增量同步
+                    $user_sync->sync_users();
+                    WP_CLI::log('执行增量用户同步...');
+                }
             }
         }
+        WP_CLI::add_command('ad-connector', 'WPAD_Connector_CLI_Command');
     }
-    WP_CLI::add_command('ad-connector', 'WPAD_Connector_CLI_Command');
-}
+});
