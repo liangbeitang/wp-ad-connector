@@ -22,13 +22,13 @@ register_activation_hook(__FILE__, function() {
     add_option('wpad_captcha_appid', '');
 
     // 刷新重写规则，确保新规则生效
-    flush_rewrite_rules();
+    // flush_rewrite_rules(); // 暂时注释掉，避免激活时刷新重写规则导致问题
 });
 
 // 插件加载时的钩子，当 WordPress 加载插件时会执行该函数
 add_action('init', function() {
     add_rewrite_rule('^ad-login$', 'index.php?ad_login=true', 'top');
-    flush_rewrite_rules(); // 刷新重写规则，确保新规则生效
+    // flush_rewrite_rules(); // 暂时注释掉，避免每次加载时刷新重写规则
 });
 
 add_filter('query_vars', function($query_vars) {
@@ -171,3 +171,32 @@ function handle_ad_login() {
         wp_send_json_error('验证码验证失败，请重试。');
     }
 }
+
+// 确保设置页面类在插件加载时被实例化
+add_action('plugins_loaded', function() {
+    // 加载多语言支持，确保插件能在不同语言环境下正常显示
+    load_plugin_textdomain('wp-ad-connector', false, dirname(plugin_basename(__FILE__)) . '/languages/');
+
+    // 包含核心类文件
+    require_once dirname(__FILE__) . '/includes/class-ad-operator.php';
+    require_once dirname(__FILE__) . '/includes/class-user-sync.php';
+    require_once dirname(__FILE__) . '/includes/class-password-reset.php';
+    require_once dirname(__FILE__) . '/includes/class-mail-service.php';
+    require_once dirname(__FILE__) . '/includes/settings-page.php';
+    require_once dirname(__FILE__) . '/admin/admin-interface.php';
+
+    // 初始化核心模块
+    // 实例化设置页面类，用于在 WordPress 后台显示插件的设置界面
+    new WPAD_Settings_Page();
+    // 实例化用户同步类，负责从 AD 同步用户到 WordPress
+    new WPAD_User_Sync();
+    // 实例化密码重置类，处理用户在 WordPress 中修改 AD 密码的操作
+    new WPAD_Password_Reset();
+    // 实例化邮件服务类，用于发送邮件验证码等邮件通知
+    new WPAD_Mail_Service();
+
+    // 加载密码修改端点，包含用户资料扩展及相关表单处理逻辑
+    require_once dirname(__FILE__) . '/public/user-profile.php';
+
+    // 处理验证 AD 配置的 AJAX 请求
+});
