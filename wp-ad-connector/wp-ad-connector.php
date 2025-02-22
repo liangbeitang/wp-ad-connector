@@ -18,6 +18,8 @@ register_activation_hook(__FILE__, function() {
     add_option('wpad_default_role', 'subscriber');
     // 密码策略级别，默认设置为 'medium'
     add_option('wpassword_policy', 'medium');
+    // 腾讯云验证码appid，默认空
+    add_option('wpad_captcha_appid', '');
 });
 
 // 插件加载时的钩子，当 WordPress 加载插件时会执行该函数
@@ -70,6 +72,28 @@ add_action('plugins_loaded', function() {
         wp_send_json_error('你没有权限进行此操作。');
     });
 
+    // 添加新的登录页面处理
+    add_action('login_form', function() {
+        echo '<a href="' . site_url('/ad-login') . '" class="button button-primary">AD域登录</a>';
+    });
+
+    add_action('init', function() {
+        add_rewrite_rule('^ad-login$', 'index.php?ad_login=true', 'top');
+        flush_rewrite_rules(); // 刷新重写规则，确保新规则生效
+    });
+
+    add_filter('query_vars', function($query_vars) {
+        $query_vars[] = 'ad_login';
+        return $query_vars;
+    });
+
+    add_action('template_redirect', function() {
+        if (get_query_var('ad_login')) {
+            include plugin_dir_path(__FILE__) . 'public/ad-login.php';
+            exit;
+        }
+    });
+
     // 添加 WP-CLI 命令，方便通过命令行进行用户同步操作
     if (defined('WP_CLI') && WP_CLI) {
         class WPAD_Connector_CLI_Command extends WP_CLI_Command {
@@ -101,4 +125,46 @@ add_action('plugins_loaded', function() {
         }
         WP_CLI::add_command('ad-connector', 'WPAD_Connector_CLI_Command');
     }
+
+    // 处理AD域登录的AJAX请求
+    add_action('wp_ajax_nopriv_ad_login', function() {
+        // 检查请求方法是否为 POST
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            error_log('无效的请求方法');
+            wp_send_json_error(['message' => '无效的请求方法']);
+            return;
+        }
+
+        // 检查必要的 POST 参数是否存在
+        $required_fields = ['employee_id', 'password'];
+        foreach ($required_fields as $field) {
+            if (!isset($_POST[$field]) || empty($_POST[$field])) {
+                error_log("缺少必要参数: {$field}");
+                wp_send_json_error(['message' => "缺少必要参数: {$field}"]);
+                return;
+            }
+        }
+
+        $employee_id = sanitize_text_field($_POST['employee_id']);
+        $password = sanitize_text_field($_POST['password']);
+
+        // 这里添加AD域登录的验证逻辑，例如使用LDAP验证
+        // 假设我们有一个 WPAD_AD_Operator 类，其中有一个 verify_ad_login 方法用于验证
+        require_once dirname(__FILE__) . '/includes/class-ad-operator.php';
+        $ad_operator = new WPAD_AD_Operator();
+        $is_valid = $ad_operator->verify_ad_login($employee_id, $password);
+
+        $response = [
+            'success' => false,
+            'data' => '登录失败，请检查输入信息。',
+            'redirect_url' => site_url('/wp-admin')
+        ];
+
+        if ($is_valid) {
+            $response['success'] = true;
+        }
+
+        error_log('返回的响应内容: ' . json_encode($response));
+        wp_send_json($response);
+    });
 });

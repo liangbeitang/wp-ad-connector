@@ -263,6 +263,47 @@ class WPAD_AD_Operator {
     }
 
     /**
+     * 验证 AD 登录
+     *
+     * @param string $employee_id AD employeeID
+     * @param string $password 密码
+     * @return bool 如果验证成功，返回 true；否则返回 false
+     */
+    public function verify_ad_login($employee_id, $password) {
+        if (!$this->ldap_connection) {
+            if (!$this->connect()) {
+                error_log('LDAP 连接失败');
+                return false;
+            }
+        }
+
+        // 根据 employeeID 查找用户 DN
+        $filter = "(employeeID=$employee_id)";
+        $search_result = ldap_search($this->ldap_connection, $this->base_dn, $filter);
+        if (!$search_result) {
+            error_log('用户 DN 查找失败');
+            return false;
+        }
+
+        $entries = ldap_get_entries($this->ldap_connection, $search_result);
+        if ($entries['count'] <= 0) {
+            error_log('未找到用户 DN');
+            return false;
+        }
+
+        $user_dn = $entries[0]['dn'];
+
+        // 验证密码
+        $bind_result = ldap_bind($this->ldap_connection, $user_dn, $password);
+        if (!$bind_result) {
+            error_log('密码验证失败');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * 关闭 LDAP 连接
      */
     public function close() {
@@ -271,7 +312,12 @@ class WPAD_AD_Operator {
         }
     }
     
+    /**
+     * 获取 LDAP 连接
+     *
+     * @return resource|null LDAP 连接资源，如果没有连接则返回 null
+     */
     public function getLdapConnection() {
-    return $this->ldap_connection;
-}
+        return $this->ldap_connection;
+    }
 }

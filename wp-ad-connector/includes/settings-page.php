@@ -77,6 +77,31 @@ class WPAD_Settings_Page {
         update_option('wpad_service_account_password', $admin_password);
         update_option('wpad_ad_search_org_dn', $search_org_dn);
 
+        // 保存腾讯云验证码appid配置项
+        if (isset($_POST['wpad_captcha_appid'])) {
+            update_option('wpad_captcha_appid', sanitize_text_field($_POST['wpad_captcha_appid']));
+        }
+
+        // 保存腾讯云验证码 secret key 配置项
+        if (isset($_POST['wpad_captcha_secret_key'])) {
+            update_option('wpad_captcha_secret_key', sanitize_text_field($_POST['wpad_captcha_secret_key']));
+        }
+
+        // 保存企业名称配置项
+        if (isset($_POST['wpad_enterprise_name'])) {
+            update_option('wpad_enterprise_name', sanitize_text_field($_POST['wpad_enterprise_name']));
+        }
+
+        // 保存腾讯云账户SecretID配置项
+        if (isset($_POST['wpad_tenctent_account_SecretID'])) {
+            update_option('wpad_tenctent_account_SecretID', sanitize_text_field($_POST['wpad_tenctent_account_SecretID']));
+        }
+
+        // 保存腾讯云账户SecretKey配置项
+        if (isset($_POST['wpad_tencent_account_SecretKey'])) {
+            update_option('wpad_tencent_account_SecretKey', sanitize_text_field($_POST['wpad_tencent_account_SecretKey']));
+        }
+
         // 保存成功后重定向并添加配置保存成功的标志
         wp_redirect(add_query_arg('config_saved', 1, admin_url('admin.php?page=wp-ad-connector-admin')));
         exit;
@@ -94,6 +119,17 @@ class WPAD_Settings_Page {
         $admin_domain = get_option('wpad_admin_domain', ''); // 直接获取保存的域名
         $admin_password = get_option('wpad_service_account_password', ''); // 修改为新的选项名
         $search_org_dn = get_option('wpad_ad_search_org_dn', '');
+
+        // 获取腾讯云验证码appid配置项
+        $captcha_appid = get_option('wpad_captcha_appid');
+        // 获取腾讯云验证码 secret key 配置项
+        $captcha_secret_key = get_option('wpad_captcha_secret_key');
+        // 获取企业名称配置项
+        $enterprise_name = get_option('wpad_enterprise_name', '');
+        // 获取腾讯云账户SecretID配置项
+        $tenctent_account_SecretID = get_option('wpad_tenctent_account_SecretID', '');
+        // 获取腾讯云账户SecretKey配置项
+        $tenctent_account_SecretKey = get_option('wpad_tencent_account_SecretKey', '');
 
         // 不再尝试从 service_account_dn 解析出用户名和域名
 
@@ -153,6 +189,31 @@ class WPAD_Settings_Page {
                         <th scope="row"><label for="ad_search_org_dn">查询的组织 DN</label></th>
                         <td><input type="text" id="ad_search_org_dn" name="ad_search_org_dn" value="<?php echo esc_attr($search_org_dn); ?>" class="regular-text"></td>
                     </tr>
+                    <!-- 添加腾讯云验证码appid配置项 -->
+                    <tr>
+                        <th scope="row"><label for="wpad_captcha_appid">腾讯云验证码appid</label></th>
+                        <td><input type="text" id="wpad_captcha_appid" name="wpad_captcha_appid" value="<?php echo esc_attr($captcha_appid); ?>" class="regular-text"></td>
+                    </tr>
+                    <!-- 添加腾讯云验证码 secret key 配置项 -->
+                    <tr>
+                        <th scope="row"><label for="wpad_captcha_secret_key">腾讯云验证码 secret key</label></th>
+                        <td><input type="text" id="wpad_captcha_secret_key" name="wpad_captcha_secret_key" value="<?php echo esc_attr($captcha_secret_key); ?>" class="regular-text"></td>
+                    </tr>
+                    <!-- 添加腾讯云账户SecretID配置项 -->
+                    <tr>
+                        <th scope="row"><label for="wpad_tenctent_account_SecretID">腾讯云账户SecretID</label></th>
+                        <td><input type="text" id="wpad_tenctent_account_SecretID" name="wpad_tenctent_account_SecretID" value="<?php echo esc_attr($tenctent_account_SecretID); ?>" class="regular-text"></td>
+                    </tr>
+                    <!-- 添加腾讯云账户SecretKey配置项 -->
+                    <tr>
+                        <th scope="row"><label for="wpad_tencent_account_SecretKey">腾讯云账户Secret Key</label></th>
+                        <td><input type="text" id="wpad_tencent_account_SecretKey" name="wpad_tencent_account_SecretKey" value="<?php echo esc_attr($tenctent_account_SecretKey); ?>" class="regular-text"></td>
+                    </tr>
+                    <!-- 添加企业名称配置项 -->
+                    <tr>
+                        <th scope="row"><label for="wpad_enterprise_name">企业名称配置</label></th>
+                        <td><input type="text" id="wpad_enterprise_name" name="wpad_enterprise_name" value="<?php echo esc_attr($enterprise_name); ?>" class="regular-text"></td>
+                    </tr>
                 </table>
                 <p class="submit">
                     <input type="submit" class="button button-primary" value="保存配置">
@@ -160,60 +221,60 @@ class WPAD_Settings_Page {
                     <input type="button" class="button" id="ad-config-verify" value="验证 AD 配置">
                 </p>
 
-<!-- 添加 JavaScript 代码来处理验证按钮的点击事件 -->
-<script type="text/javascript">
-    jQuery(document).ready(function($) {
-        $("#ad-config-verify").click(function() {
-            // 获取需要的字段
-            var ad_ip_address = $("#ad_ip_address").val();
-            var ad_admin_username = $("#ad_admin_username").val();
-            var ad_admin_password = $("#ad_admin_password").val();
-            var ad_admin_domain = $("#ad_admin_domain").val();
-            var ad_search_org_dn = $("#ad_search_org_dn").val(); // 确保获取 ad_search_org_dn 的值
+                <!-- 添加 JavaScript 代码来处理验证按钮的点击事件 -->
+                <script type="text/javascript">
+                    jQuery(document).ready(function($) {
+                        $("#ad-config-verify").click(function() {
+                            // 获取需要的字段
+                            var ad_ip_address = $("#ad_ip_address").val();
+                            var ad_admin_username = $("#ad_admin_username").val();
+                            var ad_admin_password = $("#ad_admin_password").val();
+                            var ad_admin_domain = $("#ad_admin_domain").val();
+                            var ad_search_org_dn = $("#ad_search_org_dn").val(); // 确保获取 ad_search_org_dn 的值
 
-            $.ajax({
-                url: ajaxurl,
-                type: "POST",
-                data: {
-                    action: "ad_verify_config",
-                    ad_ip_address: ad_ip_address,
-                    ad_admin_username: ad_admin_username,
-                    ad_admin_password: ad_admin_password,
-                    ad_admin_domain: ad_admin_domain,
-                    ad_search_org_dn: ad_search_org_dn // 添加 ad_search_org_dn 参数
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // 验证成功，显示绿色提示
-                        var successMessage = "验证成功<br>服务器地址: " + ad_ip_address + "<br>用户名: " + ad_admin_username;
-                        showMessage(successMessage, 'green');
-                    } else {
-                        // 验证失败，显示红色提示
-                        var errorMessage = "验证失败: " + response.data.message;
-                        showMessage(errorMessage, 'red');
-                    }
-                },
-                error: function() {
-                    // 验证请求失败，显示红色提示
-                    showMessage("验证请求失败，请稍后重试。", 'red');
-                }
-            });
-        });
+                            $.ajax({
+                                url: ajaxurl,
+                                type: "POST",
+                                data: {
+                                    action: "ad_verify_config",
+                                    ad_ip_address: ad_ip_address,
+                                    ad_admin_username: ad_admin_username,
+                                    ad_admin_password: ad_admin_password,
+                                    ad_admin_domain: ad_admin_domain,
+                                    ad_search_org_dn: ad_search_org_dn // 添加 ad_search_org_dn 参数
+                                },
+                                success: function(response) {
+                                    if (response.success) {
+                                        // 验证成功，显示绿色提示
+                                        var successMessage = "验证成功<br>服务器地址: " + ad_ip_address + "<br>用户名: " + ad_admin_username;
+                                        showMessage(successMessage, 'green');
+                                    } else {
+                                        // 验证失败，显示红色提示
+                                        var errorMessage = "验证失败: " + response.data.message;
+                                        showMessage(errorMessage, 'red');
+                                    }
+                                },
+                                error: function() {
+                                    // 验证请求失败，显示红色提示
+                                    showMessage("验证请求失败，请稍后重试。", 'red');
+                                }
+                            });
+                        });
 
-        // 显示提示信息的函数
-        function showMessage(message, color) {
-            var messageDiv = $('<div></div>')
-               .html(message)
-               .css({
-                    'color': color,
-                    'padding': '10px',
-                    'margin': '10px 0',
-                    'border': '1px solid ' + color
-                });
-            $('#ad-config-verify').after(messageDiv);
-        }
-    });
-</script>
+                        // 显示提示信息的函数
+                        function showMessage(message, color) {
+                            var messageDiv = $('<div></div>')
+                               .html(message)
+                               .css({
+                                    'color': color,
+                                    'padding': '10px',
+                                    'margin': '10px 0',
+                                    'border': '1px solid ' + color
+                                });
+                            $('#ad-config-verify').after(messageDiv);
+                        }
+                    });
+                </script>
             </form>
         </div>
         <?php
