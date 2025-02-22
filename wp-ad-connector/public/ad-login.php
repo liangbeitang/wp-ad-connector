@@ -103,6 +103,13 @@ $ajax_url = admin_url('admin-ajax.php'); // 定义 AJAX 请求的 URL
     </form>
 
     <script>
+        // 定义全局变量存储验证码结果
+        let captchaResult = {
+            ret: null,
+            randstr: '',
+            ticket: ''
+        };
+
         // 定义验证码js加载错误处理函数
         function loadErrorCallback() {
             var appid = '<?php echo esc_js($captcha_appid); ?>';
@@ -132,7 +139,10 @@ $ajax_url = admin_url('admin-ajax.php'); // 定义 AJAX 请求的 URL
                     // 验证码回调函数
                     console.log('callback:', res);
                     if (res.ret === 0) {
-                        // 验证码验证成功，启用登录按钮
+                        // 验证码验证成功，存储结果
+                        captchaResult.ret = res.ret;
+                        captchaResult.randstr = res.randstr;
+                        captchaResult.ticket = res.ticket;
                         document.getElementById('ad-login-button').disabled = false;
                         document.getElementById('message').innerHTML = '';
                     } else if (res.ret === 2) {
@@ -145,10 +155,7 @@ $ajax_url = admin_url('admin-ajax.php'); // 定义 AJAX 请求的 URL
                 }, {
                     userLanguage: 'zh-cn',
                     showFn: (ret) => {
-                        const {
-                            duration, // 验证码渲染完成的耗时(ms)
-                            sid, // 链路sid
-                        } = ret;
+                        const { duration, sid } = ret;
                     },
                 });
                 // 调用方法，显示验证码
@@ -168,17 +175,25 @@ $ajax_url = admin_url('admin-ajax.php'); // 定义 AJAX 请求的 URL
             }
 
             var formData = new FormData(event.target);
-            // 这里假设之前验证码验证成功后有设置全局变量存储 res.randstr 和 res.ticket
-            // 可以通过其他方式确保这里能拿到正确的值
-            // formData.append('captcha_randstr', res.randstr);
-            // formData.append('captcha_ticket', res.ticket);
+            formData.append('action', 'nopriv_ad_login');
+            formData.append('captcha_randstr', captchaResult.randstr);
+            formData.append('captcha_ticket', captchaResult.ticket);
 
-            fetch('<?php echo $ajax_url; ?>', { // 使用定义的 AJAX 请求 URL
+            fetch('<?php echo $ajax_url; ?>', {
                 method: 'POST',
                 body: formData
             })
-           .then(response => response.json())
+           .then(response => {
+                if (!response.ok) {
+                    // 获取详细的错误信息
+                    return response.text().then(text => {
+                        throw new Error(`Network response was not ok: ${response.status} ${response.statusText} - ${text}`);
+                    });
+                }
+                return response.json();
+            })
            .then(data => {
+                console.log('后端返回的数据:', data);
                 if (data.success) {
                     window.location.href = data.redirect_url;
                 } else {
@@ -186,7 +201,9 @@ $ajax_url = admin_url('admin-ajax.php'); // 定义 AJAX 请求的 URL
                 }
             })
            .catch(error => {
-                document.getElementById('message').innerHTML = '登录请求失败，请稍后重试。';
+                console.error('登录请求出错:', error);
+                // 显示详细的错误信息给用户
+                document.getElementById('message').innerHTML = `登录请求失败，详细错误信息：${error.message}，请稍后重试。`;
             });
         });
     </script>
